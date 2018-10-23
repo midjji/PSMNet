@@ -1,6 +1,12 @@
+# python 3.7 and pytorch 4.1 compatability port. 
+Basically its the same as before, it trains fine and can load the pretrained models. 
+Regardless of if the original or this version is used there is a minor issue with training pretrained versions, specifically I think it has to do with the batchnorm params not beeing loaded. Basically it will converge in a few iterations to a correct answer however. 
+
+
 # Pyramid Stereo Matching Network
 
 This repository contains the code (in PyTorch) for "[Pyramid Stereo Matching Network](https://arxiv.org/abs/1803.08669)" paper (CVPR 2018) by [Jia-Ren Chang](https://jiarenchang.github.io/) and [Yong-Sheng Chen](https://people.cs.nctu.edu.tw/~yschen/).
+
 
 ### Citation
 ```
