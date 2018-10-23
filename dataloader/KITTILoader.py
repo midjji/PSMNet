@@ -1,16 +1,17 @@
 import torch.utils.data as data
 import random
-from PIL import Image, ImageOps
+from PIL import Image
 import numpy as np
 from utils import preprocess
 
 
-IMG_EXTENSIONS = [
-    '.jpg', '.JPG', '.jpeg', '.JPEG',
-    '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
-]
+
 
 def is_image_file(filename):
+    IMG_EXTENSIONS = [
+        '.jpg', '.JPG', '.jpeg', '.JPEG',
+        '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
+    ]
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
 def default_loader(path):

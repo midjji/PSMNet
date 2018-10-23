@@ -24,7 +24,7 @@ def default_loader(path):
 
     #print("pilimshape: " + str(pilim.size))
     test=pilim
-    test.convert('RGB')
+
     #print("pilimshape: " + str(test.size))
 
     #print("Very uncertain what transpose should be applied?")
