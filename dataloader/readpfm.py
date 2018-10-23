@@ -1,7 +1,5 @@
 import re
 import numpy as np
-import sys
- 
 
 def readPFM(file):
     file = open(file, 'rb')
@@ -13,20 +11,20 @@ def readPFM(file):
     endian = None
 
     header = file.readline().rstrip()
-    if header == 'PF':
+    if header.decode("ascii") == 'PF':
         color = True
-    elif header == 'Pf':
+    elif header.decode("ascii") == 'Pf':
         color = False
     else:
         raise Exception('Not a PFM file.')
 
-    dim_match = re.match(r'^(\d+)\s(\d+)\s$', file.readline())
+    dim_match = re.match(r'^(\d+)\s(\d+)\s$', file.readline().decode("ascii"))
     if dim_match:
-        width, height = map(int, dim_match.groups())
+        width, height = list(map(int, dim_match.groups()))
     else:
         raise Exception('Malformed PFM header.')
 
-    scale = float(file.readline().rstrip())
+    scale = float(file.readline().decode("ascii").rstrip())
     if scale < 0: # little-endian
         endian = '<'
         scale = -scale
@@ -38,5 +36,5 @@ def readPFM(file):
 
     data = np.reshape(data, shape)
     data = np.flipud(data)
-    return data, scale
+    return data
 
