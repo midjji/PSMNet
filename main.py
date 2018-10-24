@@ -137,12 +137,6 @@ def train(imgL,imgR, disp_L, show_images=False):
                 cv2.namedWindow("diff2", 0)
                 cv2.imshow("diff2", diff2)
 
-
-
-
-
-
-
                 #computing 3-px error#
                 error = np.sum((np.abs(disp_gt - batchres) < 3) * cpu_mask)
 

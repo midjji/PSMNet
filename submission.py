@@ -7,18 +7,17 @@ import torch.nn.parallel
 import torch.utils.data
 from torch.autograd import Variable
 
+import skimage.io
 
 import numpy as np
 import time
 from utils import preprocess 
 from models import *
 
-# 2012 data /media/jiaren/ImageNet/data_scene_flow_2012/testing/
-
 parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('--KITTI', default='2015',
                     help='KITTI version')
-parser.add_argument('--datapath', default='/media/jiaren/ImageNet/data_scene_flow_2015/testing/',
+parser.add_argument('--datapath', default='/archive/datasets/psmnetdatasets/',
                     help='select model')
 parser.add_argument('--loadmodel', default=None,
                     help='loading model')
@@ -77,6 +76,9 @@ def test(imgL,imgR):
 
         return pred_disp
 
+def ensure_dir():
+    pass
+
 
 def main():
    processed = preprocess.get_transform(augment=False)
@@ -103,7 +105,10 @@ def main():
        top_pad   = 384-imgL_o.shape[0]
        left_pad  = 1248-imgL_o.shape[1]
        img = pred_disp[top_pad:,:-left_pad]
-       skimage.io.imsave(test_left_img[inx].split('/')[-1],(img*256).astype('uint16'))
+       ensure_dir(submissionpath)
+       output="submissionpath/"+test_left_img[inx].split('/')[-1];
+       skimage.io.imsave(output,(img*256).astype('uint16'))
+
 
 if __name__ == '__main__':
    main()
