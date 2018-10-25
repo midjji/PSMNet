@@ -2,16 +2,14 @@ import os
 import os.path
 
 
-IMG_EXTENSIONS = [
-    '.jpg', '.JPG', '.jpeg', '.JPEG',
-    '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
-]
-
-
 def is_image_file(filename):
+    IMG_EXTENSIONS = [
+        '.jpg', '.JPG', '.jpeg', '.JPEG',
+        '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
+    ]
     return any(filename.endswith(extension) for extension in IMG_EXTENSIONS)
 
-def dataloader(filepath):
+def kittidataloader(filepath, split=160):
 
   left_fold  = 'image_2/'
   right_fold = 'image_3/'
@@ -20,8 +18,8 @@ def dataloader(filepath):
 
   image = [img for img in os.listdir(filepath+left_fold) if img.find('_10') > -1]
 
-  train = image[:160]
-  val   = image[160:]
+  train = image[:split]
+  val   = image[split:]
 
   left_train  = [filepath+left_fold+img for img in train]
   right_train = [filepath+right_fold+img for img in train]

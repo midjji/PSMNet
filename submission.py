@@ -106,7 +106,7 @@ def main():
        left_pad  = 1248-imgL_o.shape[1]
        img = pred_disp[top_pad:,:-left_pad]
        ensure_dir(submissionpath)
-       output="submissionpath/"+test_left_img[inx].split('/')[-1];
+       output="submissionpath/"+test_left_img[inx].split('/')[-1]
        skimage.io.imsave(output,(img*256).astype('uint16'))
 
 

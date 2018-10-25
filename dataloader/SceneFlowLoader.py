@@ -37,6 +37,7 @@ def preprocess(img):
 def default_loader(path):
     cv2im=cv2.imread(path)
     cv2im=cv2.cvtColor(cv2im,cv2.COLOR_BGR2RGB)
+    cv2im=cv2im/ 255 - 0.5
 
     return preprocess(cv2im)#,(Image.open(path).convert('RGB')) # same as pilim after postprocess...
 
@@ -49,7 +50,7 @@ def disparity_loader(path):
     return torch.tensor(np.ascontiguousarray(readPFM(path),dtype=np.float32))
 
 
-class myImageFloder(data.Dataset):
+class FreiburgLoader(data.Dataset):
     def __init__(self, left, right, left_disparity, training, loader=default_loader, dploader= disparity_loader):
  
         self.left = left
@@ -84,16 +85,15 @@ class myImageFloder(data.Dataset):
             return left_img, right_img, dataL
 
         else:
-            #
 
             dim, h, w = left_img.shape
-            l=torch.tensor(np.zeros((3,544,w), dtype=float ))
+            l=torch.tensor(np.zeros((3,544,w), dtype=np.float32 ))
             l[:,4:,:]=left_img
             left_img=l
-            r = torch.tensor(np.zeros((3,544,w), dtype=float ))
+            r = torch.tensor(np.zeros((3,544,w), dtype=np.float32 ))
             r[:, 4:, :] = right_img
             right_img = r
-            d = torch.tensor(np.zeros((3,544,w), dtype=float ))
+            d = torch.tensor(np.zeros((3,544,w), dtype=np.float32 ))
             d[:, 4:, :] = dataL
             dataL = d
 

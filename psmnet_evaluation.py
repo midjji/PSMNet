@@ -19,7 +19,7 @@ from models import stackhourglass, basic
 import cv2
 import numpy as np
 
-from unpackage.evaluation import evaluate_model
+from unpackage.evaluation import evaluate_model,analyze_result
 
 parser = argparse.ArgumentParser(description='PSMNet')
 parser.add_argument('--maxdisp', type=int, default=192,
@@ -38,7 +38,7 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
-parser.add_argument('--dataset', default='')
+parser.add_argument('--dataset', default='2015')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -51,12 +51,16 @@ if args.cuda:
 
 
 if args.dataset == '2015':
-    from dataloader import KITTI_submission_loader as DA
-    test_left_img, test_right_img = DA.dataloader(args.datapath)
+    args.datapath="/archive/datasets/kitti/stereo2015/training/"
+    from dataloader.KITTIloader2015 import kittidataloader
+    from dataloader.KITTILoader import KittiLoader
+    train_left, train_right, train_disp, test_left_img, test_right_img, test_disp = kittidataloader(args.datapath)
     TrainImgLoader = torch.utils.data.DataLoader(
-        DA.myImageFloder(all_left_img, all_right_img, all_left_disp, training=False),
-        batch_size=1, shuffle=False, num_workers=1, drop_last=False)
-
+        KittiLoader(train_left, train_right, train_disp,  training=False),
+        batch_size=4, shuffle=False, num_workers=8, drop_last=False)
+    TestImgLoader = torch.utils.data.DataLoader(
+        KittiLoader(test_left_img, test_right_img, test_disp, training=False),
+        batch_size=4, shuffle=False, num_workers=8, drop_last=False)
 
 
 if args.dataset == '2012':
@@ -69,7 +73,7 @@ if args.dataset == '':
     all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
     something=[all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp]
     for l in something:
-        l[:]=l[0:30]
+        l[:]=l[0:100]
 
 
     TrainImgLoader = torch.utils.data.DataLoader(
@@ -135,15 +139,16 @@ def main():
 
 
     model.eval()
-    train_errors = evaluate_model(model, TrainImgLoader)
+    train_errors = analyze_result(evaluate_model(model, TrainImgLoader))
+    print(train_errors)
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
     print("Done evaluating Training data")
 
 
-    validation_errors = evaluate_model(model, TestImgLoader)
-
-    # write to disk somehow?
+    validation_errors = analyze_result(evaluate_model(model, TestImgLoader))
+    print(validation_errors)
+    print("Done evaluating validation errors!")
 
 
 

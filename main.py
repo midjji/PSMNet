@@ -35,6 +35,7 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='enables CUDA training')
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
+parser.add_argument('--dataset', default='2015')
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -42,15 +43,46 @@ torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
 
-all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
 
-TrainImgLoader = torch.utils.data.DataLoader(
-         DA.myImageFloder(all_left_img,all_right_img,all_left_disp, True), 
-         batch_size= 5, shuffle= True, num_workers= 8, drop_last=False)
 
-TestImgLoader = torch.utils.data.DataLoader(
-         DA.myImageFloder(test_left_img,test_right_img,test_left_disp, False), 
-         batch_size= 5, shuffle= False, num_workers=8, drop_last=False)
+
+
+if args.dataset == '2015':
+    args.datapath="/archive/datasets/kitti/stereo2015/training/"
+    from dataloader.KITTIloader2015 import kittidataloader
+    from dataloader.KITTILoader import KittiLoader
+    train_left, train_right, train_disp, test_left_img, test_right_img, test_disp = kittidataloader(args.datapath, split=160)
+    TrainImgLoader = torch.utils.data.DataLoader(
+        KittiLoader(train_left, train_right, train_disp,  training=True),
+        batch_size=5, shuffle=False, num_workers=8, drop_last=False)
+    TestImgLoader = torch.utils.data.DataLoader(
+        KittiLoader(test_left_img, test_right_img, test_disp, training=True),
+        batch_size=5, shuffle=False, num_workers=8, drop_last=False)
+
+
+
+
+if args.dataset == '':
+    from dataloader import listflowfile as lt
+    from dataloader import SceneFlowLoader as DA
+
+    all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
+    something=[all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp]
+    for l in something:
+        l[:]=l[0:100]
+
+
+    TrainImgLoader = torch.utils.data.DataLoader(
+        DA.FreiburgLoader(all_left_img, all_right_img, all_left_disp, training=True),
+        batch_size=5, shuffle=False, num_workers=0, drop_last=False)
+
+    TestImgLoader = torch.utils.data.DataLoader(
+        DA.FreiburgLoader(test_left_img, test_right_img, test_left_disp, training=True),
+        batch_size=5, shuffle=False, num_workers=0, drop_last=False)
+
+
+
+
 
 
 if args.model == 'stackhourglass':
@@ -72,18 +104,76 @@ print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in mo
 
 optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
 
+
+
+def show_image(rgb, name=""):
+
+    if(len(rgb.shape)==3):
+        img=cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR)
+    else:
+        img=rgb
+
+    cv2.namedWindow(name,0)
+    cv2.imshow(name,img)
+
+def tensor2rgb(tensor):
+    # base transform is to -0.5 to 0.5
+    if(len(tensor.shape)==3):
+        return np.transpose(tensor.cpu().numpy(),(1,2,0)) + 0.5
+    return tensor.cpu().numpy().astype(np.float32)
+
+
+def show_tensor(tensor, name=""):
+    show_image(tensor2rgb(tensor),name)
+
+
+def show_batch(left,right,disp,estimate,max=1):
+    mask = ((disp < args.maxdisp) * (disp > 0))
+    for b in range(min(max,left.shape[0])):
+
+
+        show_tensor(left[b,:,:,:].squeeze(), "left: "+str(b))
+        show_tensor(right[b, :, :,:].squeeze(), "right: " + str(b))
+        show_tensor(disp[b, :, :].squeeze(), "disp: " + str(b))
+        show_tensor(estimate[b, :, :].squeeze(), "estimate: " + str(b))
+        show_tensor(mask[b,:,:].squeeze(),"mask")
+
+
+        diff = torch.abs(estimate[b,:,:] - disp[b,:,:]) * mask[b,:,:].float()
+
+        show_tensor(diff,"diff")
+        #diff=diff>=3
+        #show_tensor(diff,"errors")
+
+
+
+    cv2.waitKey(110)
+
+
+
+
+
+
+
+
 def train(imgL,imgR, disp_L, show_images=False):
-        model.train()
-        imgL   = Variable(torch.FloatTensor(imgL))
-        imgR   = Variable(torch.FloatTensor(imgR))   
-        disp_L = Variable(torch.FloatTensor(disp_L))
+
+        imgL   = imgL
+        imgR   = imgR
+        disp_L = disp_L
+
+
+        assert args.cuda
 
         if args.cuda:
             imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
        #---------
-        mask = disp_true < args.maxdisp
-        mask.detach_()
+        # must be >0 because 0 is their flag for failure... that collides with usual use of negative numbers...
+        mask =((disp_true < args.maxdisp ) * (disp_true >0))
+
+
+
         #----
         optimizer.zero_grad()
         
@@ -100,6 +190,7 @@ def train(imgL,imgR, disp_L, show_images=False):
             loss = F.smooth_l1_loss(output3[mask], disp_true[mask])
 
         if show_images:
+                show_batch(imgL,imgR,disp_true,output.detach(), max=1)
                 cpu_mask = mask.cpu().numpy()[0,:,:]
 
                 tmp = imgL.cpu().numpy()
@@ -126,7 +217,7 @@ def train(imgL,imgR, disp_L, show_images=False):
                 cv2.namedWindow("mask", 0)
                 cv2.imshow("mask",cpu_mask.astype('float32'))
 
-                diff = np.absolute(batchres - disp_gt)
+                diff = np.absolute(batchres - disp_gt) * cpu_mask
 
                 diff1 = diff - np.min(diff)
                 diff1 = diff / max(64, np.max(diff))
@@ -138,10 +229,10 @@ def train(imgL,imgR, disp_L, show_images=False):
                 cv2.imshow("diff2", diff2)
 
                 #computing 3-px error#
-                error = np.sum((np.abs(disp_gt - batchres) < 3) * cpu_mask)
+                error = np.sum((np.abs(disp_gt - batchres) >= 3) * cpu_mask)
 
                 assert np.sum(cpu_mask== 0) + np.sum(cpu_mask == 1) == cpu_mask.size
-                print("3-px error: " + str(100- 0.01*np.round(10000*error/np.sum(cpu_mask)))+"%")
+                print('3-pixel error: {0:.1f}%'.format(100*error/np.sum(cpu_mask)))
 
 
 
@@ -183,6 +274,9 @@ def adjust_learning_rate(optimizer, epoch):
 
 
 def main():
+
+    model.train()
+
     start_full_time = time.time()
     for epoch in range(1, args.epochs + 1):
         print('This is %d-th epoch' % (epoch))
@@ -193,7 +287,7 @@ def main():
         for batch_idx, (imgL_crop, imgR_crop, disp_crop_L) in enumerate(TrainImgLoader):
             start_time = time.time()
 
-            loss = train(imgL_crop, imgR_crop, disp_crop_L, batch_idx % 5==0)
+            loss = train(imgL_crop, imgR_crop, disp_crop_L, batch_idx % 50==0)
             print('Iter %d training loss = %.3f , time = %.2f' % (batch_idx, loss, time.time() - start_time))
             total_train_loss += loss
         print('epoch %d total training loss = %.3f' % (epoch, total_train_loss / len(TrainImgLoader)))

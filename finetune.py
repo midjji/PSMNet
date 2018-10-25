@@ -86,7 +86,7 @@ def train(imgL,imgR,disp_L,show_images):
             imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
         #---------
-        mask = (disp_true >= 0)
+        mask = (disp_true > 0) # is it possible that they are that stupid, setting ...
         mask.detach_()
         #----
 
