@@ -37,7 +37,9 @@ def preprocess(img):
 def default_loader(path):
     cv2im=cv2.imread(path)
     cv2im=cv2.cvtColor(cv2im,cv2.COLOR_BGR2RGB)
+    cv2im=cv2im.astype(np.float32)
     cv2im=cv2im/ 255 - 0.5
+
 
     return preprocess(cv2im)#,(Image.open(path).convert('RGB')) # same as pilim after postprocess...
 
