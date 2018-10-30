@@ -101,6 +101,10 @@ class PSMNet(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
+    def get_disparity_image(self,prediction):
+        if len(prediction)==3:
+            return prediction[2]
+        return prediction
 
     def forward(self, left, right):
 

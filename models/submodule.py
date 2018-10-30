@@ -97,6 +97,8 @@ class feature_extraction(nn.Module):
         self.lastconv = nn.Sequential(convbn(320, 128, 3, 1, 1, 1),
                                       nn.ReLU(inplace=True),
                                       nn.Conv2d(128, 32, kernel_size=1, padding=0, stride = 1, bias=False))
+        self.output_chanels=32
+        self.name="PSMNET extractor"
 
     def _make_layer(self, block, planes, blocks, stride, pad, dilation):
         downsample = None
@@ -115,6 +117,7 @@ class feature_extraction(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+
         output      = self.firstconv(x)
         output      = self.layer1(output)
         output_raw  = self.layer2(output)
@@ -140,6 +143,7 @@ class feature_extraction(nn.Module):
 
         output_feature = torch.cat((output_raw, output_skip, output_branch4, output_branch3, output_branch2, output_branch1), 1)
         output_feature = self.lastconv(output_feature)
+
 
         return output_feature
 
