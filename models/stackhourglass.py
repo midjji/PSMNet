@@ -108,7 +108,7 @@ class PSMNet(nn.Module):
 
     def forward(self, left, right):
 
-        assert left.shape[0] > 1, "YOU MUST HAVE A LARGER BATCH SIZE THAN ONE, WE USE PIXIE DUST!!"
+        #assert left.shape[0] > 1, "YOU MUST HAVE A LARGER BATCH SIZE THAN ONE, WE USE PIXIE DUST!!"
 
         refimg_fea     = self.feature_extraction(left)
         targetimg_fea  = self.feature_extraction(right)
