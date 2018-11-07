@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import math
 from .submodule import disparityregression, feature_extraction,convbn_3d
 
+from unpackage.losses import DisparityPrediction
+
 class hourglass(nn.Module):
     def __init__(self, inplanes):
         super(hourglass, self).__init__()
@@ -105,6 +107,8 @@ class PSMNet(nn.Module):
         if len(prediction)==3:
             return prediction[2]
         return prediction
+    def get_disparity_prediction_wrapper(self, forward_result):
+        return DisparityPrediction(psmnetoutput=forward_result)
 
     def forward(self, left, right):
 
@@ -116,6 +120,7 @@ class PSMNet(nn.Module):
 
         #matching
         cost = Variable(torch.FloatTensor(refimg_fea.size()[0], refimg_fea.size()[1]*2, self.maxdisp//4,  refimg_fea.size()[2],  refimg_fea.size()[3]).zero_()).cuda()
+
 
         for i in range(self.maxdisp//4):
             if i > 0 :
