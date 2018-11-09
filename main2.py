@@ -1,3 +1,9 @@
+# correct paths, if started with this one, its here
+import sys
+# if started from
+sys.path.insert(0, "../../")
+from unpackage.util import show_batch,show_tensor,show_image
+
 import argparse
 
 import torch
@@ -32,48 +38,13 @@ parser.add_argument('--no-cuda', action='store_true', default=False,
 parser.add_argument('--seed', type=int, default=1, metavar='S',
                     help='random seed (default: 1)')
 parser.add_argument('--dataset', default='')
+parser.add_argument('--test', default=False)
 args = parser.parse_args()
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 torch.manual_seed(args.seed)
 if args.cuda:
     torch.cuda.manual_seed(args.seed)
-
-
-
-
-if args.dataset == '2015':
-    args.datapath="/archive/datasets/kitti/stereo2015/training/"
-    from dataloader.KITTIloader2015 import kittidataloader
-    from dataloader.KITTILoader import KittiLoader
-    train_left, train_right, train_disp, test_left_img, test_right_img, test_disp = kittidataloader(args.datapath, split=160)
-    TrainImgLoader = torch.utils.data.DataLoader(
-        KittiLoader(train_left, train_right, train_disp,  training=True),
-        batch_size=5, shuffle=False, num_workers=8, drop_last=False)
-    TestImgLoader = torch.utils.data.DataLoader(
-        KittiLoader(test_left_img, test_right_img, test_disp, training=True),
-        batch_size=5, shuffle=False, num_workers=8, drop_last=False)
-
-
-
-
-if args.dataset == '':
-    from dataloader import listflowfile as lt
-    from dataloader import SceneFlowLoader as DA
-
-    all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
-    something=[all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp]
-    for l in something:
-        l[:]=l[0:100]
-
-
-    TrainImgLoader = torch.utils.data.DataLoader(
-        DA.FreiburgLoader(all_left_img, all_right_img, all_left_disp, training=True),
-        batch_size=5, shuffle=False, num_workers=0, drop_last=False)
-
-    TestImgLoader = torch.utils.data.DataLoader(
-        DA.FreiburgLoader(test_left_img, test_right_img, test_left_disp, training=True),
-        batch_size=5, shuffle=False, num_workers=0, drop_last=False)
 
 
 if args.model == 'stackhourglass':
@@ -96,47 +67,6 @@ print('Number of model parameters: {}'.format(sum([p.data.nelement() for p in mo
 optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
 
 
-def show_image(rgb, name=""):
-    if (len(rgb.shape) == 3):
-        img = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-    else:
-        img = rgb
-
-    cv2.namedWindow(name, 0)
-    cv2.imshow(name, img)
-
-
-def tensor2rgb(tensor):
-    # base transform is to -0.5 to 0.5
-    if (len(tensor.shape) == 3):
-        return np.transpose(tensor.cpu().numpy(), (1, 2, 0)) + 0.5
-    return tensor.cpu().numpy().astype(np.float32) /128
-
-
-def show_tensor(tensor, name=""):
-    show_image(tensor2rgb(tensor), name)
-
-
-def show_batch(left, right, disp, estimate, max=1):
-    mask = ((disp < args.maxdisp) * (disp > 0))
-    for b in range(min(max, left.shape[0])):
-        show_tensor(left[b, :, :, :].squeeze(), "left: " + str(b))
-        show_tensor(right[b, :, :, :].squeeze(), "right: " + str(b))
-        show_tensor(disp[b, :, :].squeeze(), "disp: " + str(b))
-        show_tensor(estimate[b, :, :].squeeze(), "estimate: " + str(b))
-
-        #show_tensor(mask[b, :, :].squeeze(), "mask")
-
-        diff = torch.abs(estimate[b, :, :] - disp[b, :, :]) * mask[b, :, :].float()
-
-        show_tensor(diff*128/3, "diff")
-        diff=diff>=3
-        print("sum:" +str(torch.sum(diff)))
-
-        # show_tensor(diff,"errors")
-
-    cv2.waitKey(110)
-
 
 def train(imgL, imgR, disp_L, show_images=False):
     imgL = imgL
@@ -149,8 +79,8 @@ def train(imgL, imgR, disp_L, show_images=False):
         imgL, imgR, disp_true = imgL.cuda(), imgR.cuda(), disp_L.cuda()
 
     # ---------
-    # must be >0 because 0 is their flag for failure... that collides with usual use of negative numbers...
-    mask = ((disp_true < args.maxdisp) * (disp_true > 0))
+    # with our datareader impossible disparities are negative instead
+    mask = ((disp_true < args.maxdisp) * (disp_true >= 0))
 
     # ----
     optimizer.zero_grad()
@@ -170,7 +100,7 @@ def train(imgL, imgR, disp_L, show_images=False):
         loss = F.smooth_l1_loss(output3[mask], disp_true[mask])
 
     if show_images:
-        show_batch(imgL, imgR, disp_true, output.detach(), max=1)
+        show_batch(imgL, imgR, disp_true, output.detach(), 1,maxdisp=192)
 
     loss.backward()
     optimizer.step()
@@ -179,30 +109,33 @@ def train(imgL, imgR, disp_L, show_images=False):
 
 def test(imgL, imgR, disp_true):
     model.eval()
-    imgL = Variable(torch.FloatTensor(imgL))
-    imgR = Variable(torch.FloatTensor(imgR))
+    imgL = torch.FloatTensor(imgL)
+    imgR = torch.FloatTensor(imgR)
     if args.cuda:
-        imgL, imgR = imgL.cuda(), imgR.cuda()
+        imgL, imgR,disp_true = imgL.cuda(), imgR.cuda(), disp_true.cuda()
 
     # ---------
-    mask = disp_true < args.maxdisp and disp_true >= 0
+    mask = (disp_true < args.maxdisp) * (disp_true >= 0) ==1
     # ----
 
     with torch.no_grad():
         output3 = model(imgL, imgR)
 
-    output = torch.squeeze(output3.data.cpu(), 1)[:, 4:, :]
+    #output = torch.squeeze(output3.data.cpu(), 1)[:, 4:, :] # not needed when using our loader, the padding is
 
     if len(disp_true[mask]) == 0:
         loss = 0
     else:
-        loss = torch.mean(torch.abs(output[mask] - disp_true[mask]))  # end-point-error
+
+        loss = torch.mean(torch.abs(output3[mask] - disp_true[mask]))  # end-point-error
 
     return loss
 
 
 def adjust_learning_rate(optimizer, epoch):
     lr = 0.001
+    if args.loadmodel is not None:
+        lr=0.0001
     for param_group in optimizer.param_groups:
         param_group['lr'] = lr
 
@@ -220,7 +153,7 @@ def main():
 
     augmenter=DisparityAugmenter()
     parameters = {'subsample_input': 1,
-                  'n_depths': 127,}
+                  'n_depths': 192,}
 
     dtrain=DataLoader(DisparityDatasetWrapper(dtrain,parameters), num_workers=8, batch_size=6)
 
@@ -228,35 +161,36 @@ def main():
 
 
 
+    if not args.test and False:
+        model.train()
 
-    model.train()
+        start_full_time = time.time()
+        for epoch in range(1, args.epochs + 1):
+            print('This is %d-th epoch' % (epoch))
+            total_train_loss = 0
+            adjust_learning_rate(optimizer, epoch)
 
-    start_full_time = time.time()
-    for epoch in range(1, args.epochs + 1):
-        print('This is %d-th epoch' % (epoch))
-        total_train_loss = 0
-        adjust_learning_rate(optimizer, epoch)
-
-        ## training ##
-        for batch_idx, (left,right, disp,rdisp) in enumerate(dtrain):
-            start_time = time.time()
-            left,right,disp,rdisp=augmenter(left,right,disp,rdisp)
+            ## training ##
+            for batch_idx, (left,right, disp) in enumerate(dtrain):
+                start_time = time.time()
+                left,right,disp=augmenter(left,right,disp)
 
 
-            loss = train(left,right,disp, batch_idx % 50 == 0)
-            print('Iter %d training loss = %.3f , time = %.2f' % (batch_idx, loss, time.time() - start_time))
-            total_train_loss += loss
-        print('epoch %d total training loss = %.3f' % (epoch, total_train_loss / len(dtrain)))
 
-        # SAVE
-        savefilename = args.savemodel + '/checkpoint_' + str(epoch) + '.tar'
-        torch.save({
-            'epoch': epoch,
-            'state_dict': model.state_dict(),
-            'train_loss': total_train_loss / len(TrainImgLoader),
-        }, savefilename)
+                loss = train(left,right,disp, batch_idx % 2 == 0 and False)
+                print('Iter %d training loss = %.3f , time = %.2f' % (batch_idx, loss, time.time() - start_time))
+                total_train_loss += loss
+            print('epoch %d total training loss = %.3f' % (epoch, total_train_loss / len(dtrain)))
 
-    print('full training time = %.2f HR' % ((time.time() - start_full_time) / 3600))
+            # SAVE
+            savefilename = args.savemodel + '/checkpoint_' + str(epoch) + '.tar'
+            torch.save({
+                'epoch': epoch,
+                'state_dict': model.state_dict(),
+                'train_loss': total_train_loss / len(TrainImgLoader),
+            }, savefilename)
+
+        print('full training time = %.2f HR' % ((time.time() - start_full_time) / 3600))
 
     # ------------- TEST ------------------------------------------------------------
     total_test_loss = 0

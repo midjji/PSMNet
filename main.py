@@ -1,3 +1,10 @@
+# correct paths, if started with this one, its here
+import sys
+# if started from
+sys.path.insert(0, "../../")
+
+
+
 
 import argparse
 
@@ -16,6 +23,10 @@ from dataloader import SceneFlowLoader as DA
 from models import stackhourglass,basic
 import cv2
 import numpy as np
+
+
+
+
 
 
 parser = argparse.ArgumentParser(description='PSMNet')
@@ -56,7 +67,7 @@ if args.dataset == '2015':
         KittiLoader(train_left, train_right, train_disp,  training=True),
         batch_size=5, shuffle=False, num_workers=8, drop_last=False)
     TestImgLoader = torch.utils.data.DataLoader(
-        KittiLoader(test_left_img, test_right_img, test_disp, training=True),
+        KittiLoader(test_left_img, test_right_img, test_disp, training=False),
         batch_size=5, shuffle=False, num_workers=8, drop_last=False)
 
 
@@ -68,8 +79,7 @@ if args.dataset == '':
 
     all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp = lt.dataloader(args.datapath)
     something=[all_left_img, all_right_img, all_left_disp, test_left_img, test_right_img, test_left_disp]
-    for l in something:
-        l[:]=l[0:100]
+    #for l in something:        l[:]=l[0:100]
 
 
     TrainImgLoader = torch.utils.data.DataLoader(
@@ -77,7 +87,7 @@ if args.dataset == '':
         batch_size=5, shuffle=False, num_workers=0, drop_last=False)
 
     TestImgLoader = torch.utils.data.DataLoader(
-        DA.FreiburgLoader(test_left_img, test_right_img, test_left_disp, training=True),
+        DA.FreiburgLoader(test_left_img, test_right_img, test_left_disp, training=False),
         batch_size=5, shuffle=False, num_workers=0, drop_last=False)
 
 
@@ -106,48 +116,6 @@ optimizer = optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999))
 
 
 
-def show_image(rgb, name=""):
-
-    if(len(rgb.shape)==3):
-        img=cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR)
-    else:
-        img=rgb
-
-    cv2.namedWindow(name,0)
-    cv2.imshow(name,img)
-
-def tensor2rgb(tensor):
-    # base transform is to -0.5 to 0.5
-    if(len(tensor.shape)==3):
-        return np.transpose(tensor.cpu().numpy(),(1,2,0)) + 0.5
-    return tensor.cpu().numpy().astype(np.float32)
-
-
-def show_tensor(tensor, name=""):
-    show_image(tensor2rgb(tensor),name)
-
-
-def show_batch(left,right,disp,estimate,max=1):
-    mask = ((disp < args.maxdisp) * (disp > 0))
-    for b in range(min(max,left.shape[0])):
-
-
-        show_tensor(left[b,:,:,:].squeeze(), "left: "+str(b))
-        show_tensor(right[b, :, :,:].squeeze(), "right: " + str(b))
-        show_tensor(disp[b, :, :].squeeze(), "disp: " + str(b))
-        show_tensor(estimate[b, :, :].squeeze(), "estimate: " + str(b))
-        show_tensor(mask[b,:,:].squeeze(),"mask")
-
-
-        diff = torch.abs(estimate[b,:,:] - disp[b,:,:]) * mask[b,:,:].float()
-
-        show_tensor(diff,"diff")
-        #diff=diff>=3
-        #show_tensor(diff,"errors")
-
-
-
-    cv2.waitKey(110)
 
 
 
@@ -191,7 +159,7 @@ def train(imgL,imgR, disp_L, show_images=False):
             loss = F.smooth_l1_loss(output3[mask], disp_true[mask])
 
         if show_images:
-                show_batch(imgL,imgR,disp_true,output.detach(), max=1)
+
                 cpu_mask = mask.cpu().numpy()[0,:,:]
 
                 tmp = imgL.cpu().numpy()
@@ -252,7 +220,7 @@ def test(imgL,imgR,disp_true):
             imgL, imgR = imgL.cuda(), imgR.cuda()
 
         #---------
-        mask = disp_true < args.maxdisp and disp_true >= 0
+        mask = disp_true < args.maxdisp and disp_true > 0 # for their dataloader incorrct disparities are 0
         #----
 
         with torch.no_grad():
