@@ -67,7 +67,8 @@ class disparityregression(nn.Module):
 
 class feature_extraction(nn.Module):
     def __init__(self):
-        super(feature_extraction, self).__init__()
+        super().__init__()
+
         self.inplanes = 32
         self.firstconv = nn.Sequential(convbn(3, 32, 3, 2, 1, 1),
                                        nn.ReLU(inplace=True),
@@ -149,6 +150,3 @@ class feature_extraction(nn.Module):
 
 
         return output_feature
-
-
-

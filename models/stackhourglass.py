@@ -51,12 +51,14 @@ class hourglass(nn.Module):
         return out, pre, post
 
 class PSMNet(nn.Module):
-    def __init__(self, maxdisp):
+    def __init__(self, n_depths):
         super(PSMNet, self).__init__()
-        if isinstance(maxdisp,dict):
-            self.maxdisp=maxdisp['n_depths']
+        if isinstance(n_depths,dict):
+            self.settings = n_depths
+            self.n_depths=n_depths['n_depths']
         else:
-            self.maxdisp = maxdisp
+            self.n_depths = n_depths
+
 
         self.feature_extraction = feature_extraction()
 
@@ -87,12 +89,16 @@ class PSMNet(nn.Module):
                                       nn.ReLU(inplace=True),
                                       nn.Conv3d(32, 1, kernel_size=3, padding=1, stride=1,bias=False))
 
+
+
+
+
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, nn.Conv3d):
-                n = m.kernel_size[0] * m.kernel_size[1]*m.kernel_size[2] * m.out_channels
+                n = m.kernel_size[0] * m.kernel_size[1] * m.kernel_size[2] * m.out_channels
                 m.weight.data.normal_(0, math.sqrt(2. / n))
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
@@ -119,10 +125,10 @@ class PSMNet(nn.Module):
 
 
         #matching
-        cost = Variable(torch.FloatTensor(refimg_fea.size()[0], refimg_fea.size()[1]*2, self.maxdisp//4,  refimg_fea.size()[2],  refimg_fea.size()[3]).zero_()).cuda()
+        cost = torch.FloatTensor(refimg_fea.size()[0], refimg_fea.size()[1]*2, self.n_depths//4,  refimg_fea.size()[2],  refimg_fea.size()[3]).zero_().cuda()
 
 
-        for i in range(self.maxdisp//4):
+        for i in range(self.n_depths//4):
             if i > 0 :
              cost[:, :refimg_fea.size()[1], i, :,i:]   = refimg_fea[:,:,:,i:]
              cost[:, refimg_fea.size()[1]:, i, :,i:] = targetimg_fea[:,:,:,:-i]
@@ -149,23 +155,23 @@ class PSMNet(nn.Module):
 
         if self.training:
 
-            cost1 = F.interpolate(cost1, [self.maxdisp, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
+            cost1 = F.interpolate(cost1, [self.n_depths, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
 
-            cost2 = F.interpolate(cost2, [self.maxdisp, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
+            cost2 = F.interpolate(cost2, [self.n_depths, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
 
             cost1 = torch.squeeze(cost1,1)
             pred1 = F.softmax(cost1,dim=1)
-            pred1 = disparityregression(self.maxdisp)(pred1)
+            pred1 = disparityregression(self.n_depths)(pred1)
 
             cost2 = torch.squeeze(cost2,1)
             pred2 = F.softmax(cost2,dim=1)
-            pred2 = disparityregression(self.maxdisp)(pred2)
+            pred2 = disparityregression(self.n_depths)(pred2)
 
 
-        cost3 = F.interpolate(cost3, [self.maxdisp, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
+        cost3 = F.interpolate(cost3, [self.n_depths, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
         cost3 = torch.squeeze(cost3,1)
         pred3 = F.softmax(cost3,dim=1)
-        pred3 = disparityregression(self.maxdisp)(pred3)
+        pred3 = disparityregression(self.n_depths)(pred3)
 
         if self.training:
             return pred1, pred2, pred3

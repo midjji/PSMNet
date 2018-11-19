@@ -9,32 +9,34 @@ import torch.nn.parallel
 import torch.utils.data
 
 
-from .models import stackhourglass, basic
-
-
-class PSMNET_WEIGHTS:
-    def __init__(self):
-        self.stackedhourglass=None
-
-    def get_pretrained_stackhourglass(self, name="others_code/PSMNet/pretrained/pretrained_sceneflow.tar"):
-        if self.stackedhourglass is None:
-            cwd = os.getcwd()
-
-            self.stackedhourglass=stackhourglass(192)
-            self.stackedhourglass = nn.DataParallel(self.stackedhourglass)
-            self.stackedhourglass.cuda()
-            state_dict = torch.load(cwd+"/"+name)
-            self.stackedhourglass.load_state_dict(state_dict['state_dict'])
-        return self.stackedhourglass
-    def get_feature_extractor(self):
-
-        model=self.get_pretrained_stackhourglass()
-        return model.feature_extraction
+from .models import stackhourglass, basic, feature_extraction
 
 
 
 
+def get_pretrained_stackhourglass( settings):
 
 
+    path=os.getcwd() + settings['pretrained_models_path']
+
+    model=stackhourglass(192)
 
 
+    model = nn.DataParallel(model)
+    model.cuda()
+    state_dict = torch.load(path)
+    model.load_state_dict(state_dict['state_dict'])
+    model=model.module.cpu()
+    return model
+
+
+def get_pretrained_feature_extractor(settings):
+
+    model=get_pretrained_stackhourglass(settings)
+
+    return model.feature_extraction
+
+def get_psmnet_feature_extractor(settings):
+    if settings['load_pretrained_feature_extractor']:
+        return get_pretrained_feature_extractor(settings)
+    return feature_extraction()
