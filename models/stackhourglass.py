@@ -156,7 +156,6 @@ class PSMNet(nn.Module):
         if self.training:
 
             cost1 = F.interpolate(cost1, [self.n_depths, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
-
             cost2 = F.interpolate(cost2, [self.n_depths, left.size()[2], left.size()[3]], mode='trilinear',align_corners=False)
 
             cost1 = torch.squeeze(cost1,1)

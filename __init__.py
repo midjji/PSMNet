@@ -1,1 +1,1 @@
-from .psmnet_weights import get_psmnet_feature_extractor,get_pretrained_stackhourglass
+from .psmnet_weights import get_psmnet_feature_extractor,get_pretrained_stackhourglass,get_pretrained_feature_extractor
